@@ -1,12 +1,14 @@
 """
 buywise-flask-rag/app.py
 
-Flask RAG app with:
+Optimized Flask RAG app with:
 - scikit-learn NearestNeighbors (Windows-friendly)
 - OpenAI v1 client
 - Defensive error handling
 - Supabase Google login (optional)
 - CORS enabled for Vercel + localhost
+- Parallel SerpAPI + scraping
+- Embedding cache for speed
 - Endpoints: /search, /recommendations
 """
 
@@ -14,7 +16,9 @@ import os
 import re
 import json
 import logging
+import hashlib
 from typing import List, Dict, Any, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 import numpy as np
@@ -59,6 +63,29 @@ docs: List[Dict] = []
 embeddings: List[List[float]] = []
 nn_model: Optional[NearestNeighbors] = None
 
+# ----------------- Embedding Cache -----------------
+embedding_cache: Dict[str, List[float]] = {}
+
+
+def cache_key(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def get_embedding(text: str) -> List[float]:
+    """Cached OpenAI embeddings"""
+    if not text:
+        raise ValueError("Empty text for embedding")
+    key = cache_key(text)
+    if key in embedding_cache:
+        return embedding_cache[key]
+    resp = openai_client.embeddings.create(
+        model="text-embedding-3-small",
+        input=text
+    )
+    emb = resp.data[0].embedding
+    embedding_cache[key] = emb
+    return emb
+
 
 # ----------------- Helpers -----------------
 def serpapi_search(query: str, site: str = None, num: int = 5) -> List[Dict[str, Any]]:
@@ -74,7 +101,7 @@ def serpapi_search(query: str, site: str = None, num: int = 5) -> List[Dict[str,
         return []
 
 
-def fetch_page_text(url: str, timeout: int = 8) -> str:
+def fetch_page_text(url: str, timeout: int = 5) -> str:
     try:
         resp = requests.get(url, headers=HEADERS, timeout=timeout)
         if not resp.ok:
@@ -100,13 +127,6 @@ def extract_price(text: str) -> int:
             except ValueError:
                 continue
     return -1
-
-
-def get_embedding(text: str) -> List[float]:
-    if not text:
-        raise ValueError("Empty text for embedding")
-    resp = openai_client.embeddings.create(model="text-embedding-3-small", input=text)
-    return resp.data[0].embedding
 
 
 def upsert_product_doc(url: str, title: str, price: int, snippet: str):
@@ -194,10 +214,33 @@ CORS(
 @app.errorhandler(Exception)
 def handle_exception(e):
     logger.exception("Unhandled exception: %s", e)
-    return jsonify({"error": "Server error", "details": str(e)}), 500
+    return jsonify({"error": "Server error"}), 500
 
 
 # ----------------- Routes -----------------
+def process_result(query: str, site: str):
+    """Fetch SerpAPI results for a site, scrape pages, and build docs."""
+    collected = []
+    try:
+        for r in serpapi_search(query, site=site, num=2):
+            url, title, snippet = r.get("link"), r.get("title", ""), r.get("snippet", "")
+            if not url:
+                continue
+            text = fetch_page_text(url)
+            price = extract_price(snippet or text)
+            doc = f"{title}\nPrice: {price if price!=-1 else 'Unknown'}\n{snippet or text[:400]}"
+
+            # Dedup by URL
+            if any(d["url"] == url for d in docs):
+                continue
+
+            upsert_product_doc(url, title, price, doc)
+            collected.append({"url": url, "title": title, "price": price, "snippet": doc})
+    except Exception as e:
+        logger.warning("process_result failed for %s: %s", site, e)
+    return collected
+
+
 @app.route("/search", methods=["POST", "GET"])
 def search():
     if request.method == "GET":
@@ -211,16 +254,15 @@ def search():
     slider_values = payload.get("slider_values")
 
     collected = []
-    for site in INDIAN_ECOM_SITES:
-        for r in serpapi_search(query, site=site, num=2):
-            url, title, snippet = r.get("link"), r.get("title", ""), r.get("snippet", "")
-            if not url:
-                continue
-            text = fetch_page_text(url)
-            price = extract_price(snippet or text)
-            doc = f"{title}\nPrice: {price if price!=-1 else 'Unknown'}\n{snippet or text[:400]}"
-            upsert_product_doc(url, title, price, doc)
-            collected.append({"url": url, "title": title, "price": price, "snippet": doc})
+
+    # ⚡ Run sites in parallel
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(process_result, query, site) for site in INDIAN_ECOM_SITES]
+        for f in as_completed(futures):
+            collected.extend(f.result())
+
+    # ⚡ Limit number of docs per request
+    collected = collected[:6]
 
     retrieved = retrieve_similar(query, top_k=5)
     synthesis = synthesize_recommendation_with_preferences(query, retrieved, radio_selection, slider_values)
@@ -229,7 +271,7 @@ def search():
         "query": query,
         "radio_selection": radio_selection,
         "slider_values": slider_values,
-        "quick_hits": collected[:5],
+        "quick_hits": collected,
         "recommendations": synthesis
     })
 
