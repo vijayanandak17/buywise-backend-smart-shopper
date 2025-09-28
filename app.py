@@ -198,16 +198,9 @@ def synthesize_recommendation_with_preferences(user_query, retrieved_docs, radio
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")
 
-# ✅ Proper CORS setup
-allowed_origins = [
-    "https://buywise-smart-shopper.vercel.app",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000"
-]
-
 CORS(
     app,
-    resources={r"/*": {"origins": allowed_origins}},
+    resources={r"/*": {"origins": "*"}},
     supports_credentials=True
 )
 
