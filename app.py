@@ -157,7 +157,7 @@ def synthesize_recommendation_with_preferences(user_query: str, retrieved_docs: 
 
 app = Flask(__name__)
 app.secret_key = "supersecret"   # ⚠️ use env in prod
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": "https://buywise-smart-shopper.vercel.app/"}})
 
 # ----------------- Auth Routes -----------------
 
