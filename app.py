@@ -21,7 +21,7 @@ import numpy as np
 from sklearn.neighbors import NearestNeighbors
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify, redirect, session
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 from openai import OpenAI
@@ -77,6 +77,8 @@ def serpapi_search(query: str, site: str = None, num: int = 5) -> List[Dict[str,
 def fetch_page_text(url: str, timeout: int = 8) -> str:
     try:
         resp = requests.get(url, headers=HEADERS, timeout=timeout)
+        if not resp.ok:
+            return ""
         soup = BeautifulSoup(resp.text, "html.parser")
         for tag in soup(["script", "style", "noscript"]):
             tag.extract()
@@ -175,7 +177,7 @@ def synthesize_recommendation_with_preferences(user_query, retrieved_docs, radio
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")
 
-# ✅ CORS setup
+# ✅ Proper CORS setup
 allowed_origins = [
     "https://buywise-smart-shopper.vercel.app",
     "http://localhost:3000",
@@ -185,21 +187,8 @@ allowed_origins = [
 CORS(
     app,
     resources={r"/*": {"origins": allowed_origins}},
-    supports_credentials=True,
-    allow_headers="*",
-    methods=["GET", "POST", "OPTIONS"]
+    supports_credentials=True
 )
-
-# --- Force CORS headers on every response ---
-@app.after_request
-def add_cors_headers(response):
-    origin = request.headers.get("Origin")
-    if origin in allowed_origins:
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    return response
 
 
 @app.errorhandler(Exception)
@@ -253,4 +242,5 @@ def recommendations():
 # ----------------- Run -----------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    debug = os.getenv("FLASK_DEBUG", "0") == "1"
+    app.run(host="0.0.0.0", port=port, debug=debug)
