@@ -1,0 +1,7 @@
+You are an expert graphics, a genius website designer and rated one of the best in the world. Design a website with images, photos with a theme and logo "BUY WISE". The webpage must be very colorful and users should feel very comfortable with the user interface.The page should have a caption in big stylish font  "What do you want to BUY today?". There should be promotional banners like BEST DEALS, BEST DISCOUNTS. LOWEST PRICES, HIGHEST SATISFACTION in the form of gif, clipart, photos in the webpage. It must be very similar to the uploaded image in terms of layout and options available. User should be able provide inputs to search for mobiles by price, brand, price range, apply filters and sort options. 
+
+The page should have a few lines of description on the advantage of using this website "Get The Lowest Price across all platforms NOW", "Best Technical Specification Rating to make a decision",
+"Best Mobile for Senior Citizens", "Best Mobiles for Education". Output response must list the top 3 choices based on user request and have the details on mobile brand, model, price and link to buy.
+As an add feature search for 10 accessories relevant to the response output and display as thumbnail images in the single row in the bottom. Create a drop down with the list "Mobiles", "Laptops" ,"Cars", "Air Tickets", "Hotels". 
+
+The backend URL is "http://127.0.0.1:5000" and use only one ROUTE 

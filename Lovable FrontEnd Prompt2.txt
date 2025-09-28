@@ -1,0 +1,16 @@
+You are an expert graphics and website designer and rated one of the best in the world. Design a website with images, photos with a theme and circular logo "BUY WISE". The webpage must be very colorful and users should feel very comfortable with the user interface. The page should have a caption in big stylish font  "What do you want to BUY WISE today?". 
+Have radio buttons created for user to pick one of the  choices below:
+"Best Mobile for Specification Rating"
+"Best Mobile for Senior Citizens"
+"Best Mobiles for Education"
+"Best Mobiles for Gaming"
+"Best Mobiles for Photographers"
+Include a slide bar for price range from INR 1000 to INR 300000
+
+User should be able provide inputs to search for mobiles by category, price from above tags
+
+Output response must tabulate top 3 choices based on the user request and provide mobile brand, model number, price and link to buy.
+As an add-on feature search for 10 accessories relevant to the response output and display as thumbnail images in the single row in the bottom. 
+Create a drop down with the list "Mobiles", "Laptops" ,"Cars", "Air Tickets", "Hotels" in the header.
+
+The backend URL is "http://127.0.0.1:5000" and use only one ROUTE 

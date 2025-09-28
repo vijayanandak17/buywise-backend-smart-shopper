@@ -1,0 +1,182 @@
+"""
+buywise-flask-rag/app.py
+
+Flask RAG app using scikit-learn NearestNeighbors (Windows-friendly)
+with CORS enabled for frontend integration.
+"""
+
+import os
+import re
+import json
+import logging
+from typing import List, Dict, Any
+
+import requests
+import numpy as np
+from sklearn.neighbors import NearestNeighbors
+from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+from flask import Flask, request, jsonify
+from flask_cors import CORS   # ✅ CORS
+
+import openai
+from serpapi import GoogleSearch  # pip install google-search-results
+
+# Load environment variables
+load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY")
+
+if not OPENAI_API_KEY:
+    raise RuntimeError("OPENAI_API_KEY not set in environment")
+
+openai.api_key = OPENAI_API_KEY
+
+# Logger setup
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("buywise-rag")
+
+HEADERS = {"User-Agent": "Mozilla/5.0", "Accept-Language": "en-IN,en;q=0.9"}
+INDIAN_ECOM_SITES = ["flipkart.com", "amazon.in", "croma.com", "reliancedigital.in"]
+
+# --- Storage and NearestNeighbors setup ---
+docs: List[Dict] = []
+embeddings: List[List[float]] = []
+nn_model: NearestNeighbors = None
+
+
+# --- Helper functions ---
+
+def serpapi_search(query: str, site: str = None, num: int = 5) -> List[Dict[str, Any]]:
+    q = query if not site else f"{query} site:{site}"
+    params = {"q": q, "hl": "en", "gl": "in", "num": num, "api_key": SERPAPI_API_KEY}
+    try:
+        search = GoogleSearch(params)
+        results = search.get_dict()
+        return results.get("organic_results", []) or []
+    except Exception as e:
+        logger.error("SerpAPI failed: %s", e)
+        return []
+
+
+def fetch_page_text(url: str, timeout: int = 8) -> str:
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=timeout)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for tag in soup(["script", "style", "noscript"]):
+            tag.extract()
+        return soup.get_text(separator=" ", strip=True)[:20000]
+    except Exception:
+        return ""
+
+
+def extract_price(text: str) -> int:
+    patterns = [r"₹\s?([\d,]+)", r"Rs\.?\s?([\d,]+)", r"INR\s?([\d,]+)"]
+    for p in patterns:
+        m = re.search(p, text)
+        if m:
+            return int(m.group(1).replace(",", ""))
+    return -1
+
+
+def get_embedding(text: str) -> List[float]:
+    resp = openai.Embedding.create(model="text-embedding-3-small", input=text)
+    return resp["data"][0]["embedding"]
+
+
+def upsert_product_doc(url: str, title: str, price: int, snippet: str):
+    """Add product doc into memory and retrain NN index"""
+    emb = get_embedding(snippet)
+    embeddings.append(emb)
+    docs.append({"url": url, "title": title, "price": price, "snippet": snippet})
+
+    # rebuild model each time (fine for small projects)
+    global nn_model
+    X = np.array(embeddings, dtype="float32")
+    nn_model = NearestNeighbors(n_neighbors=min(5, len(X)), metric="euclidean")
+    nn_model.fit(X)
+
+
+def retrieve_similar(query: str, top_k: int = 5):
+    if not nn_model:
+        return []
+    q_emb = np.array([get_embedding(query)], dtype="float32")
+    distances, indices = nn_model.kneighbors(q_emb, n_neighbors=min(top_k, len(docs)))
+    results = []
+    for i, idx in enumerate(indices[0]):
+        doc = docs[idx]
+        results.append({
+            "document": doc["snippet"],
+            "metadata": {"url": doc["url"], "title": doc["title"], "price": doc["price"]},
+            "distance": float(distances[0][i])
+        })
+    return results
+
+
+def synthesize_recommendation(user_query: str, retrieved_docs: List[Dict[str, Any]]):
+    system_msg = (
+        "You are a friendly, expert electronics advisor for mobile phones in India. "
+        "Use the retrieved product snippets to suggest the best mobiles. "
+        "Respond in JSON with keys: top_picks (list) and quick_summary (list)."
+    )
+    sources_text = ""
+    for doc in retrieved_docs:
+        md = doc["metadata"]
+        sources_text += f"TITLE: {md['title']}\nPRICE: {md['price']}\nURL: {md['url']}\n---\n"
+    user_msg = f"User query: {user_query}\n\nSources:\n{sources_text}\n\nJSON only."
+
+    resp = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "system", "content": system_msg},
+                  {"role": "user", "content": user_msg}],
+        temperature=0.2,
+        max_tokens=400
+    )
+    try:
+        return json.loads(resp["choices"][0]["message"]["content"])
+    except Exception:
+        return {"raw": resp["choices"][0]["message"]["content"]}
+
+
+# --- Flask App ---
+
+app = Flask(__name__)
+CORS(app)   # ✅ Enable CORS for all routes
+
+@app.route("/search", methods=["POST","GET"])
+def search():
+    payload = request.get_json(force=True)
+    query = payload.get("query")
+    if not query:
+        return jsonify({"error": "Missing query"}), 400
+
+    sites = payload.get("sites") or INDIAN_ECOM_SITES
+    collected = []
+
+    # Crawl
+    for site in sites:
+        for r in serpapi_search(query, site=site, num=3):
+            url = r.get("link")
+            title = r.get("title", "")
+            snippet = r.get("snippet", "")
+            if not url:
+                continue
+            text = fetch_page_text(url)
+            price = extract_price(snippet or text)
+            short_doc = f"{title}\nPrice: {price if price!=-1 else 'Unknown'}\n{snippet or text[:500]}"
+            upsert_product_doc(url, title, price, short_doc)
+            collected.append({"url": url, "title": title, "price": price, "snippet": short_doc})
+
+    # Retrieve & Recommend
+    retrieved = retrieve_similar(query, top_k=5)
+    synthesis = synthesize_recommendation(query, retrieved)
+
+    return jsonify({
+        "query": query,
+        "quick_hits": collected[:5],
+        "recommendations": synthesis
+    })
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)

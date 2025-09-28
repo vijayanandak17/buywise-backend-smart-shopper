@@ -1,0 +1,53 @@
+# BUY WISE - Smart Shopping Comparison Platform
+
+## Project Overview
+A vibrant, colorful e-commerce comparison website designed to help users find the best deals across multiple platforms. The site features a modern, user-friendly interface with comprehensive search and filtering capabilities.
+
+## Key Features
+
+### 🎨 Visual Design
+- **Colorful gradient-based design system** with premium UI components
+- **Responsive layout** optimized for desktop and mobile
+- **Animated elements** with smooth transitions and hover effects
+- **Professional branding** with custom BUY WISE logo
+
+### 🔍 Search & Discovery
+- **Multi-category dropdown**: Mobiles, Laptops, Cars, Air Tickets, Hotels
+- **Advanced filtering system**: Price range, brand, specifications
+- **Smart search bar** with real-time suggestions
+- **Sort options**: Price, popularity, ratings, newest
+
+### 📱 Product Features
+- **Comprehensive product listings** with detailed specifications
+- **Price comparison** across multiple platforms
+- **Technical specification ratings** for informed decisions
+- **Specialized categories**: Senior Citizens, Education-focused products
+- **Top 3 recommendations** based on user criteria
+
+### 🛍️ Shopping Experience
+- **Direct purchase links** to verified retailers
+- **Mobile accessories section** with thumbnail gallery
+- **Promotional banners**: Best Deals, Lowest Prices, Highest Satisfaction
+- **Real-time price tracking** and availability updates
+
+### 🎯 Target Audiences
+- **General consumers** seeking best deals
+- **Senior citizens** with simplified mobile options
+- **Students/Education** with budget-friendly choices
+- **Tech enthusiasts** requiring detailed specifications
+
+## Technical Stack
+- **Frontend**: React + TypeScript + Vite
+- **Styling**: Tailwind CSS with custom design tokens
+- **UI Components**: Shadcn/ui component library
+- **State Management**: React Context API
+- **Backend Integration**: RESTful API at `http://127.0.0.1:5000`
+
+## Core Value Propositions
+1. **"Get The Lowest Price across all platforms NOW"**
+2. **"Best Technical Specification Rating to make a decision"**
+3. **"Best Mobile for Senior Citizens"**
+4. **"Best Mobiles for Education"**
+
+## Main Call-to-Action
+**"What do you want to BUY today?"** - Prominently displayed hero section encouraging user engagement and product discovery.
