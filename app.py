@@ -9,6 +9,7 @@ Optimized Flask RAG app with:
 - CORS enabled for Vercel + localhost
 - Parallel SerpAPI + scraping
 - Embedding cache for speed
+- Standardized JSON responses
 - Endpoints: /search, /recommendations
 """
 
@@ -190,7 +191,7 @@ def synthesize_recommendation_with_preferences(user_query, retrieved_docs, radio
         return json.loads(content)
     except Exception as e:
         logger.error("Chat completion failed: %s", e)
-        return {"error": str(e)}
+        return {"top_picks": [], "quick_summary": [], "error": str(e)}
 
 
 # ----------------- Flask -----------------
@@ -214,7 +215,11 @@ CORS(
 @app.errorhandler(Exception)
 def handle_exception(e):
     logger.exception("Unhandled exception: %s", e)
-    return jsonify({"error": "Server error"}), 500
+    return jsonify({
+        "success": False,
+        "data": None,
+        "error": "Server error"
+    }), 500
 
 
 # ----------------- Routes -----------------
@@ -244,11 +249,20 @@ def process_result(query: str, site: str):
 @app.route("/search", methods=["POST", "GET"])
 def search():
     if request.method == "GET":
-        return jsonify({"status": "ok"})
+        return jsonify({
+            "success": True,
+            "data": {"status": "ok"},
+            "error": None
+        })
+
     payload = request.get_json(force=True, silent=True) or {}
     query = payload.get("query")
     if not query:
-        return jsonify({"error": "Missing query"}), 400
+        return jsonify({
+            "success": False,
+            "data": None,
+            "error": "Missing query"
+        }), 400
 
     radio_selection = payload.get("radio_selection")
     slider_values = payload.get("slider_values")
@@ -268,11 +282,15 @@ def search():
     synthesis = synthesize_recommendation_with_preferences(query, retrieved, radio_selection, slider_values)
 
     return jsonify({
-        "query": query,
-        "radio_selection": radio_selection,
-        "slider_values": slider_values,
-        "quick_hits": collected,
-        "recommendations": synthesis
+        "success": True,
+        "data": {
+            "query": query,
+            "radio_selection": radio_selection,
+            "slider_values": slider_values,
+            "quick_hits": collected,
+            "recommendations": synthesis
+        },
+        "error": None
     })
 
 
