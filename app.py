@@ -237,7 +237,18 @@ app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")   # ⚠️ use env in prod
 
 # Allow the Vercel front-end and handle CORS properly
-CORS(app, resources={r"/*": {"origins": ["https://buywise-smart-shopper.vercel.app"], "supports_credentials": True}})
+#CORS(app, resources={r"/*": {"origins": ["https://buywise-smart-shopper.vercel.app"], "supports_credentials": True}})
+CORS(
+    app,
+    resources={r"/*": {"origins": [
+        "https://buywise-smart-shopper.vercel.app",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+    ]}},
+    supports_credentials=True,
+    allow_headers="*",
+    methods=["GET", "POST", "OPTIONS"]
+)
 
 # ----------------- Auth Routes -----------------
 
