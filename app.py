@@ -236,17 +236,9 @@ def synthesize_recommendation_with_preferences(user_query: str,
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")   # ⚠️ use env in prod
 
-# Allow the Vercel front-end and Render backend origin for CORS
-#CORS(app, resources={r"/*": {"origins": ["https://buywise-smart-shopper.vercel.app"]}})
-CORS(
-    app,
-    resources={r"/*": {"origins": [
-        "https://buywise-smart-shopper.vercel.app",
-        "http://localhost:3000",   # for local dev
-        "http://127.0.0.1:3000"
-    ]}},
-    supports_credentials=True  # 👈 add this if using cookies/session
-)
+# Allow the Vercel front-end and handle CORS properly
+CORS(app, resources={r"/*": {"origins": ["https://buywise-smart-shopper.vercel.app"], "supports_credentials": True}})
+
 # ----------------- Auth Routes -----------------
 
 @app.route("/login/google")
