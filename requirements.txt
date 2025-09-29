@@ -13,6 +13,7 @@ distro==1.9.0
 Flask==2.3.3
 Flask-Cors==4.0.1
 google_search_results==2.4.2
+gunicorn
 h11==0.16.0
 h2==4.3.0
 hpack==4.1.0
