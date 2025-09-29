@@ -3,7 +3,7 @@ buywise-flask-rag/app.py
 
 Optimized Flask RAG app with:
 - scikit-learn NearestNeighbors (Windows-friendly)
-- OpenAI v1 client (new SDK style, reads from env)
+- OpenAI v1 client
 - Defensive error handling
 - Supabase Google login (optional)
 - CORS enabled for Vercel + localhost
@@ -36,17 +36,15 @@ from supabase import create_client, Client
 # ----------------- Load ENV -----------------
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# Fail fast if key is missing or invalid
-if not OPENAI_API_KEY or not OPENAI_API_KEY.startswith("sk-"):
-    raise RuntimeError("❌ OPENAI_API_KEY not set or invalid")
-
-# ----------------- OpenAI Init -----------------
-openai_client = OpenAI()  # Reads API key from env automatically
-
-# ----------------- Supabase Init (optional) -----------------
+SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+if not OPENAI_API_KEY:
+    raise RuntimeError("OPENAI_API_KEY not set in environment")
+
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
+
 supabase: Optional[Client] = None
 if SUPABASE_URL and SUPABASE_KEY:
     try:
@@ -92,7 +90,6 @@ def get_embedding(text: str) -> List[float]:
 
 # ----------------- Helpers -----------------
 def serpapi_search(query: str, site: str = None, num: int = 5) -> List[Dict[str, Any]]:
-    SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY")
     if not SERPAPI_API_KEY:
         return []
     q = query if not site else f"{query} site:{site}"
